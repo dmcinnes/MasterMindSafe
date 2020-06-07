@@ -69,10 +69,10 @@ RotaryEncoder encoder(2, 3);
 unsigned long currentMillis = 0;
 unsigned long nextUpdate = 0;
 
-uint8_t digit0 = 0;
-uint8_t digit1 = 0;
-uint8_t digit2 = 0;
-uint8_t digit3 = 0;
+// digits[0] is the left most side
+uint8_t digits[4];
+
+uint8_t currentDigit = 0;
 
 /*
   Send a 16-bit command packet to the device,
@@ -126,16 +126,16 @@ void loop() {
   currentMillis = millis();
   if (nextUpdate <= currentMillis) {
     nextUpdate = currentMillis + 25;
-    digit0 = encoder.getPosition() % 10;
+    digits[currentDigit] = encoderPosition();
     updateDigits();
   }
 }
 
 void updateDigits() {
-  maxWrite(MAX7219_digit0, digit0);
-  maxWrite(MAX7219_digit1, digit1);
-  maxWrite(MAX7219_digit2, digit2);
-  maxWrite(MAX7219_digit3, digit3);
+  maxWrite(MAX7219_digit3, digits[0]);
+  maxWrite(MAX7219_digit2, digits[1]);
+  maxWrite(MAX7219_digit1, digits[2]);
+  maxWrite(MAX7219_digit0, digits[3]);
 }
 
 const uint8_t timing = 50;
@@ -152,6 +152,14 @@ void pattern() {
     maxWrite(seekPattern[i][0], seekPattern[i][1]);
     delay(timing);
   }
+}
+
+uint8_t encoderPosition() {
+  long newPosition = encoder.getPosition() % 10;
+  if (newPosition < 0) {
+    newPosition += 10;
+  }
+  return uint8_t(newPosition);
 }
 
 void updateEncoder() {
