@@ -6,6 +6,7 @@
   For info and circuit diagrams see https://github.com/tardate/LittleArduinoProjects/tree/master/playground/LED7Segment/MAX7219/RawDrive
 
  */
+#include <RotaryEncoder.h>
 
 const uint8_t CS_PIN  = 10;
 const uint8_t DIN_PIN = 11;
@@ -63,6 +64,16 @@ const uint8_t seekPattern[][2] = {
   { MAX7219_digit3, MAX7219_seg_d }
 };
 
+RotaryEncoder encoder(2, 3);
+
+unsigned long currentMillis = 0;
+unsigned long nextUpdate = 0;
+
+uint8_t digit0 = 0;
+uint8_t digit1 = 0;
+uint8_t digit2 = 0;
+uint8_t digit3 = 0;
+
 /*
   Send a 16-bit command packet to the device,
   comprising the +reg+ register selection and +data+ bytes.
@@ -85,7 +96,7 @@ the intensity register will be set to its minimum value.
 */
 void initialiseDisplay() {
   maxWrite(MAX7219_scanLimit,   0x03); // only scan digits 0, 1
-  maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_NONE);
+  maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_ALL);
   maxWrite(MAX7219_displayTest, 0x00); // normal operation
   maxWrite(MAX7219_shutdown,    0x00); // display off
 }
@@ -106,18 +117,29 @@ void setup() {
 
   initialiseDisplay();
   startupDisplay(0x03);
+
+  attachInterrupt(digitalPinToInterrupt(2), updateEncoder, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(3), updateEncoder, CHANGE);
 }
 
 void loop() {
-  // run a simple display test
-  counter();
+  currentMillis = millis();
+  if (nextUpdate <= currentMillis) {
+    nextUpdate = currentMillis + 25;
+    digit0 = encoder.getPosition() % 10;
+    updateDigits();
+  }
+}
+
+void updateDigits() {
+  maxWrite(MAX7219_digit0, digit0);
+  maxWrite(MAX7219_digit1, digit1);
+  maxWrite(MAX7219_digit2, digit2);
+  maxWrite(MAX7219_digit3, digit3);
 }
 
 const uint8_t timing = 50;
-/*
- Run a looping second counter ..
- */
-void counter() {
+void pattern() {
   uint8_t prev;
   for (uint8_t i = 0; i < seekPatternSize; i++) {
     prev = i - 1;
@@ -130,4 +152,8 @@ void counter() {
     maxWrite(seekPattern[i][0], seekPattern[i][1]);
     delay(timing);
   }
+}
+
+void updateEncoder() {
+  encoder.tick(); // just call tick() to check the state.
 }
