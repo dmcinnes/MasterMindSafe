@@ -41,6 +41,7 @@ const uint8_t MAX7219_DECODE_0    = 0x01;
 const uint8_t MAX7219_DECODE_LOW  = 0x0f;
 const uint8_t MAX7219_DECODE_ALL  = 0xff;
 
+const uint8_t seekPatternSize = 18;
 const uint8_t seekPattern[][2] = {
   { MAX7219_digit3, MAX7219_seg_e },
   { MAX7219_digit3, MAX7219_seg_f },
@@ -117,34 +118,16 @@ const uint8_t timing = 50;
  Run a looping second counter ..
  */
 void counter() {
-  maxWrite(MAX7219_digit3, MAX7219_seg_e);
-  delay(timing);
-  maxWrite(MAX7219_digit3, MAX7219_seg_f);
-  delay(timing);
-  maxWrite(MAX7219_digit3, MAX7219_seg_a);
-  delay(timing);
-  maxWrite(MAX7219_digit3, 0);
-  maxWrite(MAX7219_digit2, MAX7219_seg_a);
-  delay(timing);
-  maxWrite(MAX7219_digit2, 0);
-  maxWrite(MAX7219_digit1, MAX7219_seg_a);
-  delay(timing);
-  maxWrite(MAX7219_digit1, 0);
-  maxWrite(MAX7219_digit0, MAX7219_seg_a);
-  delay(timing);
-  maxWrite(MAX7219_digit0, MAX7219_seg_b);
-  delay(timing);
-  maxWrite(MAX7219_digit0, MAX7219_seg_c);
-  delay(timing);
-  maxWrite(MAX7219_digit0, MAX7219_seg_d);
-  delay(timing);
-  maxWrite(MAX7219_digit0, 0);
-  maxWrite(MAX7219_digit1, MAX7219_seg_d);
-  delay(timing);
-  maxWrite(MAX7219_digit1, 0);
-  maxWrite(MAX7219_digit2, MAX7219_seg_d);
-  delay(timing);
-  maxWrite(MAX7219_digit2, 0);
-  maxWrite(MAX7219_digit3, MAX7219_seg_d);
-  delay(timing);
+  uint8_t prev;
+  for (uint8_t i = 0; i < seekPatternSize; i++) {
+    prev = i - 1;
+    if (i < 0) {
+      i += seekPatternSize;
+    }
+    if (seekPattern[prev][0] != seekPattern[i][0]) {
+      maxWrite(seekPattern[prev][0], MAX7219_seg_blank);
+    }
+    maxWrite(seekPattern[i][0], seekPattern[i][1]);
+    delay(timing);
+  }
 }
