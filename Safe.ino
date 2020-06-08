@@ -72,6 +72,7 @@ RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 
 unsigned long currentMillis = 0;
 unsigned long nextUpdate = 0;
+unsigned long nextButtonCheck = 0;
 
 // digits[0] is the left most side
 volatile uint8_t digits[4];
@@ -124,14 +125,17 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), updateEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), updateEncoder, CHANGE);
-
-  PCICR |= (1 << PCIE2); // turn on pin change interrupt for D pins (0-7)
-  PCMSK2 |= (1 << PD4);  // turn PC interrupt mask on for just pin 4
-  sei();
 }
 
 void loop() {
   currentMillis = millis();
+  if (nextButtonCheck <= currentMillis) {
+    nextButtonCheck = currentMillis + 5;
+    if (buttonState()) {
+      currentDigit = (currentDigit + 1) % 4;
+    }
+  }
+
   if (nextUpdate <= currentMillis) {
     nextUpdate = currentMillis + 25;
     digits[currentDigit] = encoderPosition();
@@ -174,8 +178,9 @@ void updateEncoder() {
   encoder.tick();
 }
 
-ISR(PCINT2_vect) {
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    currentDigit = (currentDigit + 1) % 4;
-  }
+bool buttonState() {
+  // debounce state
+  static uint16_t state = 0;
+  state = (state << 1) | digitalRead(BUTTON_PIN) | 0xe000;
+  return (state == 0xf000);
 }
