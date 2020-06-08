@@ -8,9 +8,13 @@
  */
 #include <RotaryEncoder.h>
 
-const uint8_t CS_PIN  = 10;
-const uint8_t DIN_PIN = 11;
-const uint8_t CLK_PIN = 13;
+const uint8_t CS_PIN        = 10;
+const uint8_t DIN_PIN       = 11;
+const uint8_t CLK_PIN       = 13;
+const uint8_t ENCODER_PIN_A = 2;
+const uint8_t ENCODER_PIN_B = 3;
+const uint8_t BUTTON_PIN    = 4;
+
 
 // register addresses
 const uint8_t MAX7219_noop        = 0x00;
@@ -64,15 +68,14 @@ const uint8_t seekPattern[][2] = {
   { MAX7219_digit3, MAX7219_seg_d }
 };
 
-RotaryEncoder encoder(2, 3);
+RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 
 unsigned long currentMillis = 0;
 unsigned long nextUpdate = 0;
 
 // digits[0] is the left most side
-uint8_t digits[4];
-
-uint8_t currentDigit = 0;
+volatile uint8_t digits[4];
+volatile uint8_t currentDigit = 0;
 
 /*
   Send a 16-bit command packet to the device,
@@ -110,6 +113,7 @@ void startupDisplay(byte intensity) {
 }
 
 void setup() {
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(DIN_PIN, OUTPUT);
   pinMode(CS_PIN, OUTPUT);
   pinMode(CLK_PIN, OUTPUT);
@@ -118,8 +122,12 @@ void setup() {
   initialiseDisplay();
   startupDisplay(0x03);
 
-  attachInterrupt(digitalPinToInterrupt(2), updateEncoder, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(3), updateEncoder, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), updateEncoder, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), updateEncoder, CHANGE);
+
+  PCICR |= (1 << PCIE2); // turn on pin change interrupt for D pins (0-7)
+  PCMSK2 |= (1 << PD4);  // turn PC interrupt mask on for just pin 4
+  sei();
 }
 
 void loop() {
@@ -163,5 +171,11 @@ uint8_t encoderPosition() {
 }
 
 void updateEncoder() {
-  encoder.tick(); // just call tick() to check the state.
+  encoder.tick();
+}
+
+ISR(PCINT2_vect) {
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    currentDigit = (currentDigit + 1) % 4;
+  }
 }
