@@ -78,6 +78,9 @@ unsigned long nextButtonCheck = 0;
 volatile uint8_t digits[4];
 volatile uint8_t currentDigit = 0;
 
+uint8_t dpDigit = 0;
+unsigned long nextDpMove = 0;
+
 /*
   Send a 16-bit command packet to the device,
   comprising the +reg+ register selection and +data+ bytes.
@@ -142,6 +145,11 @@ void loop() {
     }
   }
 
+  if (nextDpMove <= currentMillis) {
+    nextDpMove = currentMillis + 400;
+    dpDigit = (dpDigit + 1) % 4;
+  }
+
   if (nextUpdate <= currentMillis) {
     nextUpdate = currentMillis + 25;
     digits[currentDigit] = encoderPosition();
@@ -150,10 +158,10 @@ void loop() {
 }
 
 void updateDigits() {
-  maxWrite(MAX7219_digit3, digits[0]);
-  maxWrite(MAX7219_digit2, digits[1]);
-  maxWrite(MAX7219_digit1, digits[2]);
-  maxWrite(MAX7219_digit0, digits[3]);
+  maxWrite(MAX7219_digit3, digits[0] + ((dpDigit == 0) ? 0x80 : 0));
+  maxWrite(MAX7219_digit2, digits[1] + ((dpDigit == 1) ? 0x80 : 0));
+  maxWrite(MAX7219_digit1, digits[2] + ((dpDigit == 2) ? 0x80 : 0));
+  maxWrite(MAX7219_digit0, digits[3] + ((dpDigit == 3) ? 0x80 : 0));
 }
 
 const uint8_t timing = 50;
