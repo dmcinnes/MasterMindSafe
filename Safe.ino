@@ -90,6 +90,11 @@ void maxWrite(byte reg, byte data) {
   digitalWrite(CS_PIN, HIGH);
 }
 
+static uint8_t currentState = 0;
+static uint8_t stateCount   = 6;
+static void (*stateFunctions[6]) () =
+  { stateIntro, stateLock, stateGuess, stateResult, stateUnlock, stateWin };
+
 /*
 On initial power-up, all control registers are reset, the
 display is blanked, and the MAX7219/MAX7221 enter
@@ -183,4 +188,22 @@ bool buttonState() {
   static uint16_t state = 0;
   state = (state << 1) | digitalRead(BUTTON_PIN) | 0xe000;
   return (state == 0xf000);
+}
+
+void stateIntro() {
+}
+
+void stateLock() {
+}
+
+void stateGuess() {
+}
+
+void stateResult() {
+}
+
+void stateUnlock() {
+}
+
+void stateWin () {
 }
