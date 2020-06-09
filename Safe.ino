@@ -138,6 +138,7 @@ void loop() {
     nextButtonCheck = currentMillis + 5;
     if (buttonState()) {
       currentDigit = (currentDigit + 1) % 4;
+      encoder.setPosition(digits[currentDigit]);
     }
   }
 
