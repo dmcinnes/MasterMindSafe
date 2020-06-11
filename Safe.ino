@@ -76,6 +76,23 @@ const uint8_t seekPattern[][2] = {
   { MAX7219_digit3, MAX7219_seg_d }
 };
 
+const uint8_t UpperC = 0x4E;
+const uint8_t R      = 0x05;
+const uint8_t A      = 0x76;
+const uint8_t LowerC = 0x0D;
+const uint8_t UpperO = 0x77;
+const uint8_t LowerO = 0x1D;
+const uint8_t D      = 0x3D;
+const uint8_t E      = 0x4F;
+const uint8_t F      = 0x47;
+const uint8_t UpperI = 0x06;
+const uint8_t LowerI = 0x04;
+const uint8_t N      = 0x15;
+const uint8_t LowerT = 0x0F;
+const uint8_t UpperT = 0x70;
+const uint8_t UpperH = 0x37;
+const uint8_t LowerH = 0x17;
+
 RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 
 unsigned long currentMillis = 0;
@@ -115,8 +132,8 @@ digit, it will not decode data in the data registers, and
 the intensity register will be set to its minimum value.
 */
 void initialiseDisplay() {
-  maxWrite(MAX7219_scanLimit,   0x03); // only scan digits 0, 1
-  maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_ALL);
+  maxWrite(MAX7219_scanLimit,   0x03); // only scan digits 0-3
+  maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_NONE);
   maxWrite(MAX7219_displayTest, 0x00); // normal operation
   maxWrite(MAX7219_shutdown,    0x00); // display off
 }
@@ -144,29 +161,7 @@ void setup() {
 }
 
 void loop() {
-  currentMillis = millis();
-  if (nextButtonCheck <= currentMillis) {
-    nextButtonCheck = currentMillis + 5;
-    if (buttonState()) {
-      currentDigit = (currentDigit + 1) % 4;
-      encoder.setPosition(digits[currentDigit]);
-    }
-  }
-
-  if (nextSelectedDigitBlink <= currentMillis) {
-    digitBlinkOn = !digitBlinkOn;
-    if (digitBlinkOn) {
-      nextSelectedDigitBlink = currentMillis + 400;
-    } else {
-      nextSelectedDigitBlink = currentMillis + 50;
-    }
-  }
-
-  if (nextUpdate <= currentMillis) {
-    nextUpdate = currentMillis + 25;
-    digits[currentDigit] = encoderPosition();
-    updateDigits();
-  }
+  stateFunctions[currentState]();
 }
 
 void updateDigits() {
@@ -215,12 +210,50 @@ bool buttonState() {
 }
 
 void stateIntro() {
+  maxWrite(MAX7219_digit3, F);
+  maxWrite(MAX7219_digit2, LowerI);
+  maxWrite(MAX7219_digit1, N);
+  maxWrite(MAX7219_digit0, D);
+  delay(1500);
+  maxWrite(MAX7219_digit3, LowerT);
+  maxWrite(MAX7219_digit2, LowerH);
+  maxWrite(MAX7219_digit1, E);
+  maxWrite(MAX7219_digit0, MAX7219_seg_blank);
+  delay(1500);
+  maxWrite(MAX7219_digit3, UpperC);
+  maxWrite(MAX7219_digit2, LowerO);
+  maxWrite(MAX7219_digit1, D);
+  maxWrite(MAX7219_digit0, E);
+  delay(1500);
 }
 
 void stateLock() {
 }
 
 void stateGuess() {
+  currentMillis = millis();
+  if (nextButtonCheck <= currentMillis) {
+    nextButtonCheck = currentMillis + 5;
+    if (buttonState()) {
+      currentDigit = (currentDigit + 1) % 4;
+      encoder.setPosition(digits[currentDigit]);
+    }
+  }
+
+  if (nextSelectedDigitBlink <= currentMillis) {
+    digitBlinkOn = !digitBlinkOn;
+    if (digitBlinkOn) {
+      nextSelectedDigitBlink = currentMillis + 400;
+    } else {
+      nextSelectedDigitBlink = currentMillis + 50;
+    }
+  }
+
+  if (nextUpdate <= currentMillis) {
+    nextUpdate = currentMillis + 25;
+    digits[currentDigit] = encoderPosition();
+    updateDigits();
+  }
 }
 
 void stateResult() {
