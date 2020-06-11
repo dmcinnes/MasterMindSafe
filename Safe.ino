@@ -35,6 +35,7 @@ const uint8_t MAX7219_seg_f       = 0x02;
 const uint8_t MAX7219_seg_g       = 0x01;
 const uint8_t MAX7219_seg_dp      = 0x80;
 const uint8_t MAX7219_seg_blank   = 0x00;
+const uint8_t MAX7219_digit_blank = 0x0F;
 const uint8_t MAX7219_decodeMode  = 0x09;
 const uint8_t MAX7219_intensity   = 0x0a;
 const uint8_t MAX7219_scanLimit   = 0x0b;
@@ -45,6 +46,13 @@ const uint8_t MAX7219_DECODE_NONE = 0x00;
 const uint8_t MAX7219_DECODE_0    = 0x01;
 const uint8_t MAX7219_DECODE_LOW  = 0x0f;
 const uint8_t MAX7219_DECODE_ALL  = 0xff;
+
+const uint8_t digitAddresses[4] {
+  MAX7219_digit3,
+  MAX7219_digit2,
+  MAX7219_digit1,
+  MAX7219_digit0
+};
 
 const uint8_t seekPatternSize = 18;
 const uint8_t seekPattern[][2] = {
@@ -73,13 +81,13 @@ RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 unsigned long currentMillis = 0;
 unsigned long nextUpdate = 0;
 unsigned long nextButtonCheck = 0;
+unsigned long nextSelectedDigitBlink = 0;
 
 // digits[0] is the left most side
 volatile uint8_t digits[4];
 volatile uint8_t currentDigit = 0;
 
-uint8_t dpDigit = 0;
-unsigned long nextDpMove = 0;
+bool digitBlinkOn = true;
 
 /*
   Send a 16-bit command packet to the device,
@@ -145,9 +153,13 @@ void loop() {
     }
   }
 
-  if (nextDpMove <= currentMillis) {
-    nextDpMove = currentMillis + 400;
-    dpDigit = (dpDigit + 1) % 4;
+  if (nextSelectedDigitBlink <= currentMillis) {
+    digitBlinkOn = !digitBlinkOn;
+    if (digitBlinkOn) {
+      nextSelectedDigitBlink = currentMillis + 400;
+    } else {
+      nextSelectedDigitBlink = currentMillis + 50;
+    }
   }
 
   if (nextUpdate <= currentMillis) {
@@ -158,10 +170,13 @@ void loop() {
 }
 
 void updateDigits() {
-  maxWrite(MAX7219_digit3, digits[0] + ((dpDigit == 0) ? 0x80 : 0));
-  maxWrite(MAX7219_digit2, digits[1] + ((dpDigit == 1) ? 0x80 : 0));
-  maxWrite(MAX7219_digit1, digits[2] + ((dpDigit == 2) ? 0x80 : 0));
-  maxWrite(MAX7219_digit0, digits[3] + ((dpDigit == 3) ? 0x80 : 0));
+  for (uint8_t i = 0; i < 4; i++) {
+    if (i == currentDigit && !digitBlinkOn) {
+      maxWrite(digitAddresses[i], MAX7219_digit_blank);
+    } else {
+      maxWrite(digitAddresses[i], digits[i]);
+    }
+  }
 }
 
 const uint8_t timing = 50;
