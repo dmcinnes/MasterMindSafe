@@ -228,6 +228,24 @@ bool buttonState() {
   return (state == 0xf000);
 }
 
+void scrollTextTick(const uint8_t crawl[], const uint8_t size, long delta) {
+  if (nextCrawlUpdate <= currentMillis) {
+    nextCrawlUpdate = currentMillis + delta;
+    crawlOffset += 1;
+    if (crawlOffset > size + 4) {
+      crawlOffset = 0;
+    }
+    for (uint8_t i = 0; i < 4; i++) {
+      int column = crawlOffset + i - 4;
+      if (column < 0 || column > (size - 1)) {
+        maxWrite(digitAddresses[i], Space);
+      } else {
+        maxWrite(digitAddresses[i], crawl[column]);
+      }
+    }
+  }
+}
+
 void loop() {
   currentMillis = millis();
   stateFunctions[currentState]();
@@ -253,21 +271,7 @@ void stateIntro() {
 }
 
 void stateWaitForLock() {
-  if (nextCrawlUpdate <= currentMillis) {
-    nextCrawlUpdate = currentMillis + 500;
-    crawlOffset += 1;
-    if (crawlOffset > PressToLockCrawlSize + 4) {
-      crawlOffset = 0;
-    }
-    for (uint8_t i = 0; i < 4; i++) {
-      int column = crawlOffset + i - 4;
-      if (column < 0 || column > (PressToLockCrawlSize - 1)) {
-        maxWrite(digitAddresses[i], Space);
-      } else {
-        maxWrite(digitAddresses[i], PressToLockCrawl[column]);
-      }
-    }
-  }
+  scrollTextTick(PressToLockCrawl, PressToLockCrawlSize, 500);
   if (nextButtonCheck <= currentMillis) {
     nextButtonCheck = currentMillis + 5;
     if (buttonState()) {
