@@ -106,6 +106,10 @@ const uint8_t PressToLockCrawlSize = 13;
 const uint8_t PressToLockCrawl[PressToLockCrawlSize] =
 { P, R, E, S, S, Space, LowerT, LowerO, Space, L, LowerO, LowerC, K};
 
+const uint8_t LockedCrawlSize = 6;
+const uint8_t LockedCrawl[LockedCrawlSize] =
+{ L, LowerO, LowerC, K, E, D };
+
 unsigned long nextCrawlUpdate = 0;
 uint8_t crawlOffset = 0;
 
@@ -134,10 +138,11 @@ void maxWrite(byte reg, byte data) {
   digitalWrite(CS_PIN, HIGH);
 }
 
-volatile uint8_t currentState = 0;
 const uint8_t stateCount   = 7;
 void (*stateFunctions[stateCount]) () =
   { stateIntro, stateWaitForLock, stateLock, stateGuess, stateResult, stateUnlock, stateWin };
+enum States { Intro, WaitForLock, Lock, Guess, Result, Unlock, Win };
+volatile uint8_t currentState = Intro;
 
 /*
 On initial power-up, all control registers are reset, the
@@ -228,12 +233,14 @@ bool buttonState() {
   return (state == 0xf000);
 }
 
-void scrollTextTick(const uint8_t crawl[], const uint8_t size, long delta) {
+bool scrollTextTick(const uint8_t crawl[], const uint8_t size, long delta) {
+  bool done = false;
   if (nextCrawlUpdate <= currentMillis) {
     nextCrawlUpdate = currentMillis + delta;
     crawlOffset += 1;
     if (crawlOffset > size + 4) {
       crawlOffset = 0;
+      done = true;
     }
     for (uint8_t i = 0; i < 4; i++) {
       int column = crawlOffset + i - 4;
@@ -244,6 +251,11 @@ void scrollTextTick(const uint8_t crawl[], const uint8_t size, long delta) {
       }
     }
   }
+  return done;
+}
+
+void resetTextTick() {
+  crawlOffset = 0;
 }
 
 void loop() {
@@ -267,7 +279,7 @@ void stateIntro() {
   maxWrite(MAX7219_digit1, D);
   maxWrite(MAX7219_digit0, E);
   delay(1500);
-  currentState = 1;
+  currentState = WaitForLock;
 }
 
 void stateWaitForLock() {
@@ -276,23 +288,22 @@ void stateWaitForLock() {
     nextButtonCheck = currentMillis + 5;
     if (buttonState()) {
       clearDisplay();
-      currentState = 2;
+      resetTextTick();
+      currentState = Lock;
     }
   }
 }
 
 void stateLock() {
+  // lock servo
+  if (scrollTextTick(LockedCrawl, LockedCrawlSize, 500)) {
+    // stateGuess needs to decode the digits
+    maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_ALL);
+    currentState = Guess;
+  }
 }
 
 void stateGuess() {
-  if (nextButtonCheck <= currentMillis) {
-    nextButtonCheck = currentMillis + 5;
-    if (buttonState()) {
-      currentDigit = (currentDigit + 1) % 4;
-      encoder.setPosition(digits[currentDigit]);
-    }
-  }
-
   if (nextSelectedDigitBlink <= currentMillis) {
     digitBlinkOn = !digitBlinkOn;
     if (digitBlinkOn) {
@@ -306,6 +317,18 @@ void stateGuess() {
     nextUpdate = currentMillis + 25;
     digits[currentDigit] = encoderPosition();
     updateDigits();
+  }
+
+  if (nextButtonCheck <= currentMillis) {
+    nextButtonCheck = currentMillis + 5;
+    if (buttonState()) {
+      currentDigit++;
+      if (currentDigit == 4) {
+        currentDigit = 0;
+        currentState = Result;
+      }
+      encoder.setPosition(digits[currentDigit]);
+    }
   }
 }
 
