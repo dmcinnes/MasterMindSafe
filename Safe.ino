@@ -76,22 +76,38 @@ const uint8_t seekPattern[][2] = {
   { MAX7219_digit3, MAX7219_seg_d }
 };
 
-const uint8_t UpperC = 0x4E;
-const uint8_t R      = 0x05;
 const uint8_t A      = 0x76;
+const uint8_t UpperC = 0x4E;
 const uint8_t LowerC = 0x0D;
-const uint8_t UpperO = 0x77;
-const uint8_t LowerO = 0x1D;
 const uint8_t D      = 0x3D;
 const uint8_t E      = 0x4F;
 const uint8_t F      = 0x47;
-const uint8_t UpperI = 0x06;
-const uint8_t LowerI = 0x04;
-const uint8_t N      = 0x15;
-const uint8_t LowerT = 0x0F;
-const uint8_t UpperT = 0x70;
 const uint8_t UpperH = 0x37;
 const uint8_t LowerH = 0x17;
+const uint8_t UpperI = 0x06;
+const uint8_t LowerI = 0x04;
+const uint8_t K      = 0x57;
+const uint8_t L      = 0x0E;
+const uint8_t N      = 0x15;
+const uint8_t UpperO = 0x77;
+const uint8_t LowerO = 0x1D;
+const uint8_t P      = 0x67;
+const uint8_t R      = 0x05;
+const uint8_t S      = 0x5B;
+const uint8_t LowerT = 0x0F;
+const uint8_t UpperT = 0x70;
+const uint8_t Space  = 0x00;
+
+const uint8_t IntroCrawlSize = 14;
+const uint8_t IntroCrawl[IntroCrawlSize] =
+{ UpperC, R, A, LowerC, K, Space, LowerT, LowerH, E, Space, UpperC, LowerO, D, E };
+
+const uint8_t PressToLockCrawlSize = 13;
+const uint8_t PressToLockCrawl[PressToLockCrawlSize] =
+{ P, R, E, S, S, Space, LowerT, LowerO, Space, L, LowerO, LowerC, K};
+
+unsigned long nextCrawlUpdate = 0;
+uint8_t crawlOffset = 0;
 
 RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 
@@ -118,10 +134,10 @@ void maxWrite(byte reg, byte data) {
   digitalWrite(CS_PIN, HIGH);
 }
 
-static uint8_t currentState = 0;
-static uint8_t stateCount   = 6;
-static void (*stateFunctions[6]) () =
-  { stateIntro, stateLock, stateGuess, stateResult, stateUnlock, stateWin };
+volatile uint8_t currentState = 0;
+const uint8_t stateCount   = 7;
+void (*stateFunctions[stateCount]) () =
+  { stateIntro, stateWaitForLock, stateLock, stateGuess, stateResult, stateUnlock, stateWin };
 
 /*
 On initial power-up, all control registers are reset, the
@@ -160,8 +176,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), updateEncoder, CHANGE);
 }
 
-void loop() {
-  stateFunctions[currentState]();
+void clearDisplay() {
+  maxWrite(digitAddresses[0], Space);
+  maxWrite(digitAddresses[1], Space);
+  maxWrite(digitAddresses[2], Space);
+  maxWrite(digitAddresses[3], Space);
 }
 
 void updateDigits() {
@@ -209,6 +228,11 @@ bool buttonState() {
   return (state == 0xf000);
 }
 
+void loop() {
+  currentMillis = millis();
+  stateFunctions[currentState]();
+}
+
 void stateIntro() {
   maxWrite(MAX7219_digit3, F);
   maxWrite(MAX7219_digit2, LowerI);
@@ -225,13 +249,38 @@ void stateIntro() {
   maxWrite(MAX7219_digit1, D);
   maxWrite(MAX7219_digit0, E);
   delay(1500);
+  currentState = 1;
+}
+
+void stateWaitForLock() {
+  if (nextCrawlUpdate <= currentMillis) {
+    nextCrawlUpdate = currentMillis + 500;
+    crawlOffset += 1;
+    if (crawlOffset > PressToLockCrawlSize + 4) {
+      crawlOffset = 0;
+    }
+    for (uint8_t i = 0; i < 4; i++) {
+      int column = crawlOffset + i - 4;
+      if (column < 0 || column > (PressToLockCrawlSize - 1)) {
+        maxWrite(digitAddresses[i], Space);
+      } else {
+        maxWrite(digitAddresses[i], PressToLockCrawl[column]);
+      }
+    }
+  }
+  if (nextButtonCheck <= currentMillis) {
+    nextButtonCheck = currentMillis + 5;
+    if (buttonState()) {
+      clearDisplay();
+      currentState = 2;
+    }
+  }
 }
 
 void stateLock() {
 }
 
 void stateGuess() {
-  currentMillis = millis();
   if (nextButtonCheck <= currentMillis) {
     nextButtonCheck = currentMillis + 5;
     if (buttonState()) {
