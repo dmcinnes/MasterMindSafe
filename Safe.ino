@@ -96,6 +96,8 @@ const uint8_t R      = 0x05;
 const uint8_t S      = 0x5B;
 const uint8_t LowerT = 0x0F;
 const uint8_t UpperT = 0x70;
+const uint8_t LowerU = 0x1C;
+const uint8_t UpperU = 0x3E;
 const uint8_t Space  = 0x00;
 
 const uint8_t IntroCrawlSize = 14;
@@ -109,6 +111,10 @@ const uint8_t PressToLockCrawl[PressToLockCrawlSize] =
 const uint8_t LockedCrawlSize = 6;
 const uint8_t LockedCrawl[LockedCrawlSize] =
 { L, LowerO, LowerC, K, E, D };
+
+const uint8_t UnlockedCrawlSize = 8;
+const uint8_t UnlockedCrawl[UnlockedCrawlSize] =
+{ UpperU, N, L, LowerO, LowerC, K, E, D };
 
 unsigned long nextCrawlUpdate = 0;
 uint8_t crawlOffset = 0;
@@ -124,6 +130,8 @@ unsigned long nextSelectedDigitBlink = 0;
 uint8_t secretCode[4];
 uint8_t codeGuess[4];
 uint8_t currentDigit = 0;
+
+uint8_t attempts = 0;
 
 bool digitBlinkOn = true;
 
@@ -188,7 +196,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), updateEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), updateEncoder, CHANGE);
 
-  randomSeed(analogRead(0));
+  randomSeed(analogRead(A5));
 
   updateLEDs(0, 0); // set them all off
 }
@@ -354,8 +362,9 @@ void stateLock() {
   // lock servo
   if (scrollTextTick(LockedCrawl, LockedCrawlSize, 300)) {
     // stateGuess needs to decode the digits
-    maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_ALL);
+    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     generateNewCode();
+    attempts = 0;
     currentState = Guess;
   }
 }
@@ -391,6 +400,7 @@ void stateGuess() {
 
 void stateResult() {
   if (checkCodeGuess()) {
+    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
     currentState = Unlock;
   } else {
     currentState = Guess;
