@@ -120,11 +120,15 @@ unsigned long nextUpdate = 0;
 unsigned long nextButtonCheck = 0;
 unsigned long nextSelectedDigitBlink = 0;
 
-// digits[0] is the left most side
-volatile uint8_t digits[4];
-volatile uint8_t currentDigit = 0;
+// index 0 is the left most side
+uint8_t secretCode[4];
+uint8_t codeGuess[4];
+uint8_t currentDigit = 0;
 
 bool digitBlinkOn = true;
+
+int correctNumLEDs[4]   = {A0, A1, A2, A3};
+int correctPlaceLEDs[4] = {5, 6, 7, 8};
 
 /*
   Send a 16-bit command packet to the device,
@@ -168,6 +172,10 @@ void startupDisplay(byte intensity) {
 }
 
 void setup() {
+  for (uint8_t i = 0; i < 4; i++) {
+    pinMode(correctNumLEDs[i], OUTPUT);
+    pinMode(correctPlaceLEDs[i], OUTPUT);
+  }
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(DIN_PIN, OUTPUT);
   pinMode(CS_PIN, OUTPUT);
@@ -179,6 +187,10 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), updateEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), updateEncoder, CHANGE);
+
+  randomSeed(analogRead(0));
+
+  updateLEDs(0, 0); // set them all off
 }
 
 void clearDisplay() {
@@ -193,7 +205,7 @@ void updateDigits() {
     if (i == currentDigit && !digitBlinkOn) {
       maxWrite(digitAddresses[i], MAX7219_digit_blank);
     } else {
-      maxWrite(digitAddresses[i], digits[i]);
+      maxWrite(digitAddresses[i], codeGuess[i]);
     }
   }
 }
@@ -258,10 +270,54 @@ void resetTextTick() {
   crawlOffset = 0;
 }
 
+void generateNewCode() {
+  Serial.print("Code: ");
+  for (uint8_t i = 0; i < 4; i++) {
+    secretCode[i] = random(0, 9);
+  }
+}
+
+bool checkCodeGuess() {
+  uint8_t correctNum = 0;
+  uint8_t correctPlace = 0;
+  bool usedDigits[4] = {0, 0, 0, 0};
+  for (uint8_t i = 0; i < 4; i++) {
+    for (uint8_t j = 0; j < 4; j++) {
+      if (codeGuess[i] == secretCode[j] && !usedDigits[j]) {
+        correctNum++;
+        usedDigits[j] = true;
+        break;
+      }
+    }
+  }
+  for (uint8_t i=0; i < 4; i++) {
+    if (codeGuess[i] == secretCode[i]) {
+      correctPlace++;
+    }
+  }
+  updateLEDs(correctNum, correctPlace);
+  return (correctPlace == 4);
+}
+
+void updateLEDs(uint8_t corNum, uint8_t corPla) {
+  for (uint8_t i = 0; i < 4 ; i++) {
+    digitalWrite(correctNumLEDs[i], LOW);
+    digitalWrite(correctPlaceLEDs[i], LOW);
+  }
+  for (uint8_t j = 0; j < corNum; j++) {
+    digitalWrite(correctNumLEDs[j], HIGH);
+  }
+  for (uint8_t k = 0; k < corPla; k++) {
+    digitalWrite(correctPlaceLEDs[k], HIGH);
+  }
+}
+
 void loop() {
   currentMillis = millis();
   stateFunctions[currentState]();
 }
+
+/* State Functions */
 
 void stateIntro() {
   maxWrite(MAX7219_digit3, F);
@@ -296,9 +352,10 @@ void stateWaitForLock() {
 
 void stateLock() {
   // lock servo
-  if (scrollTextTick(LockedCrawl, LockedCrawlSize, 500)) {
+  if (scrollTextTick(LockedCrawl, LockedCrawlSize, 300)) {
     // stateGuess needs to decode the digits
     maxWrite(MAX7219_decodeMode,  MAX7219_DECODE_ALL);
+    generateNewCode();
     currentState = Guess;
   }
 }
@@ -315,7 +372,7 @@ void stateGuess() {
 
   if (nextUpdate <= currentMillis) {
     nextUpdate = currentMillis + 25;
-    digits[currentDigit] = encoderPosition();
+    codeGuess[currentDigit] = encoderPosition();
     updateDigits();
   }
 
@@ -327,12 +384,17 @@ void stateGuess() {
         currentDigit = 0;
         currentState = Result;
       }
-      encoder.setPosition(digits[currentDigit]);
+      encoder.setPosition(codeGuess[currentDigit]);
     }
   }
 }
 
 void stateResult() {
+  if (checkCodeGuess()) {
+    currentState = Unlock;
+  } else {
+    currentState = Guess;
+  }
 }
 
 void stateUnlock() {
