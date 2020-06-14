@@ -7,6 +7,7 @@
 
  */
 #include <RotaryEncoder.h>
+#include <Servo.h>
 
 const uint8_t CS_PIN        = 10;
 const uint8_t DIN_PIN       = 11;
@@ -122,6 +123,8 @@ uint8_t crawlOffset = 0;
 
 RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 
+Servo lockServo;
+
 unsigned long currentMillis = 0;
 unsigned long nextUpdate = 0;
 unsigned long nextButtonCheck = 0;
@@ -153,8 +156,8 @@ void maxWrite(byte reg, byte data) {
 
 const uint8_t stateCount = 9;
 void (*stateFunctions[stateCount]) () =
-  { stateIntro, stateWaitForLock, stateLockAnimation, stateLock, stateGuess, stateResult, stateUnlockAnimation, stateUnlock, stateWin };
-enum States { Intro, WaitForLock, LockAnimation, Lock, Guess, Result, UnlockAnimation, Unlock, Win };
+  { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateGuess, stateResult, stateUnlock, stateUnlockMessage, stateWin };
+enum States { Intro, WaitForLock, Lock, LockMessage, Guess, Result, Unlock, UnlockMessage, Win };
 volatile uint8_t currentState = Intro;
 
 /*
@@ -180,7 +183,17 @@ void startupDisplay(byte intensity) {
   maxWrite(MAX7219_intensity,   intensity);
 }
 
+void lockDoor() {
+  lockServo.write(180);
+}
+
+void unlockDoor() {
+  lockServo.write(0);
+}
+
 void setup() {
+  lockServo.attach(9);
+
   for (uint8_t i = 0; i < 4; i++) {
     pinMode(correctNumLEDs[i], OUTPUT);
     pinMode(correctPlaceLEDs[i], OUTPUT);
@@ -200,6 +213,8 @@ void setup() {
   randomSeed(analogRead(A5));
 
   updateLEDs(0, 0); // set them all off
+
+  unlockDoor();
 }
 
 void clearDisplay() {
@@ -354,22 +369,22 @@ void stateWaitForLock() {
     if (buttonState()) {
       clearDisplay();
       resetTextTick();
-      currentState = LockAnimation;
-    }
-  }
-}
-
-void stateLockAnimation() {
-  if (nextPatternTick <= currentMillis) {
-    nextPatternTick = currentMillis + 50;
-    if (patternTick(seekPattern, seekPatternSize)) {
       currentState = Lock;
     }
   }
 }
 
 void stateLock() {
-  // lock servo
+  lockDoor();
+  if (nextPatternTick <= currentMillis) {
+    nextPatternTick = currentMillis + 50;
+    if (patternTick(seekPattern, seekPatternSize)) {
+      currentState = LockMessage;
+    }
+  }
+}
+
+void stateLockMessage() {
   if (scrollTextTick(LockedCrawl, LockedCrawlSize, 300)) {
     // stateGuess needs to decode the digits
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
@@ -411,23 +426,24 @@ void stateGuess() {
 void stateResult() {
   if (checkCodeGuess()) {
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
-    currentState = UnlockAnimation;
+    currentState = Unlock;
   } else {
     attempts++;
     currentState = Guess;
   }
 }
 
-void stateUnlockAnimation() {
+void stateUnlock() {
+  unlockDoor();
   if (nextPatternTick <= currentMillis) {
     nextPatternTick = currentMillis + 50;
     if (patternTick(seekPattern, seekPatternSize)) {
-      currentState = Unlock;
+      currentState = UnlockMessage;
     }
   }
 }
 
-void stateUnlock() {
+void stateUnlockMessage() {
   if (scrollTextTick(UnlockedCrawl, UnlockedCrawlSize, 300)) {
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     currentState = Win;
