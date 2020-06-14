@@ -75,6 +75,7 @@ const uint8_t seekPattern[][2] = {
   { MAX7219_digit2, MAX7219_seg_blank },
   { MAX7219_digit3, MAX7219_seg_d }
 };
+unsigned long nextPatternTick = 0;
 
 const uint8_t A      = 0x76;
 const uint8_t UpperC = 0x4E;
@@ -150,10 +151,10 @@ void maxWrite(byte reg, byte data) {
   digitalWrite(CS_PIN, HIGH);
 }
 
-const uint8_t stateCount   = 7;
+const uint8_t stateCount = 9;
 void (*stateFunctions[stateCount]) () =
-  { stateIntro, stateWaitForLock, stateLock, stateGuess, stateResult, stateUnlock, stateWin };
-enum States { Intro, WaitForLock, Lock, Guess, Result, Unlock, Win };
+  { stateIntro, stateWaitForLock, stateLockAnimation, stateLock, stateGuess, stateResult, stateUnlockAnimation, stateUnlock, stateWin };
+enum States { Intro, WaitForLock, LockAnimation, Lock, Guess, Result, UnlockAnimation, Unlock, Win };
 volatile uint8_t currentState = Intro;
 
 /*
@@ -218,20 +219,20 @@ void updateDigits() {
   }
 }
 
-const uint8_t timing = 50;
-void pattern() {
-  uint8_t prev;
-  for (uint8_t i = 0; i < seekPatternSize; i++) {
-    prev = i - 1;
-    if (i < 0) {
-      i += seekPatternSize;
-    }
-    if (seekPattern[prev][0] != seekPattern[i][0]) {
-      maxWrite(seekPattern[prev][0], MAX7219_seg_blank);
-    }
-    maxWrite(seekPattern[i][0], seekPattern[i][1]);
-    delay(timing);
+bool patternTick(const uint8_t pattern[][2], uint8_t size) {
+  static int patternOffset = 0;
+  int prev = patternOffset - 1;
+  if (patternOffset >= size) {
+    patternOffset = 0;
+  } else if (patternOffset < 0) {
+    prev = size - 1;
   }
+  if (pattern[prev][0] != pattern[patternOffset][0]) {
+    maxWrite(pattern[prev][0], MAX7219_seg_blank);
+  }
+  maxWrite(pattern[patternOffset][0], pattern[patternOffset][1]);
+  patternOffset++;
+  return (patternOffset == size);
 }
 
 uint8_t encoderPosition() {
@@ -353,6 +354,15 @@ void stateWaitForLock() {
     if (buttonState()) {
       clearDisplay();
       resetTextTick();
+      currentState = LockAnimation;
+    }
+  }
+}
+
+void stateLockAnimation() {
+  if (nextPatternTick <= currentMillis) {
+    nextPatternTick = currentMillis + 50;
+    if (patternTick(seekPattern, seekPatternSize)) {
       currentState = Lock;
     }
   }
@@ -364,7 +374,7 @@ void stateLock() {
     // stateGuess needs to decode the digits
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     generateNewCode();
-    attempts = 0;
+    attempts = 1;
     currentState = Guess;
   }
 }
@@ -401,14 +411,32 @@ void stateGuess() {
 void stateResult() {
   if (checkCodeGuess()) {
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
-    currentState = Unlock;
+    currentState = UnlockAnimation;
   } else {
+    attempts++;
     currentState = Guess;
   }
 }
 
+void stateUnlockAnimation() {
+  if (nextPatternTick <= currentMillis) {
+    nextPatternTick = currentMillis + 50;
+    if (patternTick(seekPattern, seekPatternSize)) {
+      currentState = Unlock;
+    }
+  }
+}
+
 void stateUnlock() {
+  if (scrollTextTick(UnlockedCrawl, UnlockedCrawlSize, 300)) {
+    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
+    currentState = Win;
+  }
 }
 
 void stateWin () {
+  maxWrite(digitAddresses[0], attempts);
+  maxWrite(digitAddresses[1], MAX7219_digit_blank);
+  maxWrite(digitAddresses[2], MAX7219_digit_blank);
+  maxWrite(digitAddresses[3], MAX7219_digit_blank);
 }
