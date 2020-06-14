@@ -78,7 +78,7 @@ const uint8_t seekPattern[][2] = {
 };
 unsigned long nextPatternTick = 0;
 
-const uint8_t A      = 0x76;
+const uint8_t A      = 0x77;
 const uint8_t UpperC = 0x4E;
 const uint8_t LowerC = 0x0D;
 const uint8_t D      = 0x3D;
@@ -118,6 +118,10 @@ const uint8_t UnlockedCrawlSize = 8;
 const uint8_t UnlockedCrawl[UnlockedCrawlSize] =
 { UpperU, N, L, LowerO, LowerC, K, E, D };
 
+const uint8_t TriesCrawlSize = 11;
+const uint8_t TriesCrawl[TriesCrawlSize] =
+{ UpperT, LowerO, LowerT, A, L, Space, UpperT, R, LowerI, E, S };
+
 unsigned long nextCrawlUpdate = 0;
 uint8_t crawlOffset = 0;
 
@@ -154,11 +158,11 @@ void maxWrite(byte reg, byte data) {
   digitalWrite(CS_PIN, HIGH);
 }
 
-const uint8_t stateCount = 9;
+const uint8_t stateCount = 10;
 void (*stateFunctions[stateCount]) () =
-  { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateGuess, stateResult, stateUnlock, stateUnlockMessage, stateWin };
-enum States { Intro, WaitForLock, Lock, LockMessage, Guess, Result, Unlock, UnlockMessage, Win };
-volatile uint8_t currentState = Intro;
+  { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateGuess, stateResult, stateUnlock, stateUnlockMessage, stateTries, stateTriesCount };
+enum States { Intro, WaitForLock, Lock, LockMessage, Guess, Result, Unlock, UnlockMessage, Tries, TriesCount };
+volatile uint8_t currentState = Tries;
 
 /*
 On initial power-up, all control registers are reset, the
@@ -188,7 +192,7 @@ void lockDoor() {
 }
 
 void unlockDoor() {
-  lockServo.write(0);
+  lockServo.write(1);
 }
 
 void setup() {
@@ -369,6 +373,7 @@ void stateWaitForLock() {
     if (buttonState()) {
       clearDisplay();
       resetTextTick();
+      attempts = 0;
       currentState = Lock;
     }
   }
@@ -445,14 +450,22 @@ void stateUnlock() {
 
 void stateUnlockMessage() {
   if (scrollTextTick(UnlockedCrawl, UnlockedCrawlSize, 300)) {
-    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
-    currentState = Win;
+    currentState = Tries;
   }
 }
 
-void stateWin () {
+void stateTries() {
+  if (scrollTextTick(TriesCrawl, TriesCrawlSize, 300)) {
+    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
+    currentState = TriesCount;
+  }
+}
+
+void stateTriesCount() {
   maxWrite(digitAddresses[0], attempts);
   maxWrite(digitAddresses[1], MAX7219_digit_blank);
   maxWrite(digitAddresses[2], MAX7219_digit_blank);
   maxWrite(digitAddresses[3], MAX7219_digit_blank);
+  delay(4000);
+  currentState = WaitForLock;
 }
