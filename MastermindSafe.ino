@@ -9,8 +9,8 @@
 #include <RotaryEncoder.h>
 #include <Servo.h>
 
-const uint8_t CS_PIN        = 10;
-const uint8_t DIN_PIN       = 11;
+const uint8_t CS_PIN        = 11;
+const uint8_t DIN_PIN       = 10;
 const uint8_t CLK_PIN       = 13;
 const uint8_t ENCODER_PIN_A = 2;
 const uint8_t ENCODER_PIN_B = 3;
