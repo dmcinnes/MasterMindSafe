@@ -49,32 +49,32 @@ const uint8_t MAX7219_DECODE_LOW  = 0x0f;
 const uint8_t MAX7219_DECODE_ALL  = 0xff;
 
 const uint8_t digitAddresses[4] {
-  MAX7219_digit3,
-  MAX7219_digit2,
+  MAX7219_digit0,
   MAX7219_digit1,
-  MAX7219_digit0
+  MAX7219_digit2,
+  MAX7219_digit3
 };
 
 const uint8_t seekPatternSize = 18;
 const uint8_t seekPattern[][2] = {
-  { MAX7219_digit3, MAX7219_seg_e },
-  { MAX7219_digit3, MAX7219_seg_f },
-  { MAX7219_digit3, MAX7219_seg_a },
-  { MAX7219_digit3, MAX7219_seg_blank },
-  { MAX7219_digit2, MAX7219_seg_a },
-  { MAX7219_digit2, MAX7219_seg_blank },
+  { MAX7219_digit0, MAX7219_seg_e },
+  { MAX7219_digit0, MAX7219_seg_f },
+  { MAX7219_digit0, MAX7219_seg_a },
+  { MAX7219_digit0, MAX7219_seg_blank },
   { MAX7219_digit1, MAX7219_seg_a },
   { MAX7219_digit1, MAX7219_seg_blank },
-  { MAX7219_digit0, MAX7219_seg_a },
-  { MAX7219_digit0, MAX7219_seg_b },
-  { MAX7219_digit0, MAX7219_seg_c },
-  { MAX7219_digit0, MAX7219_seg_d },
-  { MAX7219_digit0, MAX7219_seg_blank },
-  { MAX7219_digit1, MAX7219_seg_d },
-  { MAX7219_digit1, MAX7219_seg_blank },
+  { MAX7219_digit2, MAX7219_seg_a },
+  { MAX7219_digit2, MAX7219_seg_blank },
+  { MAX7219_digit3, MAX7219_seg_a },
+  { MAX7219_digit3, MAX7219_seg_b },
+  { MAX7219_digit3, MAX7219_seg_c },
+  { MAX7219_digit3, MAX7219_seg_d },
+  { MAX7219_digit3, MAX7219_seg_blank },
   { MAX7219_digit2, MAX7219_seg_d },
   { MAX7219_digit2, MAX7219_seg_blank },
-  { MAX7219_digit3, MAX7219_seg_d }
+  { MAX7219_digit1, MAX7219_seg_d },
+  { MAX7219_digit1, MAX7219_seg_blank },
+  { MAX7219_digit0, MAX7219_seg_d }
 };
 unsigned long nextPatternTick = 0;
 
@@ -162,7 +162,7 @@ const uint8_t stateCount = 10;
 void (*stateFunctions[stateCount]) () =
   { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateGuess, stateResult, stateUnlock, stateUnlockMessage, stateTries, stateTriesCount };
 enum States { Intro, WaitForLock, Lock, LockMessage, Guess, Result, Unlock, UnlockMessage, Tries, TriesCount };
-volatile uint8_t currentState = Tries;
+volatile uint8_t currentState = Intro;
 
 /*
 On initial power-up, all control registers are reset, the
@@ -240,14 +240,8 @@ void updateDigits() {
 
 bool patternTick(const uint8_t pattern[][2], uint8_t size) {
   static int patternOffset = 0;
-  int prev = patternOffset - 1;
   if (patternOffset >= size) {
     patternOffset = 0;
-  } else if (patternOffset < 0) {
-    prev = size - 1;
-  }
-  if (pattern[prev][0] != pattern[patternOffset][0]) {
-    maxWrite(pattern[prev][0], MAX7219_seg_blank);
   }
   maxWrite(pattern[patternOffset][0], pattern[patternOffset][1]);
   patternOffset++;
@@ -348,20 +342,20 @@ void loop() {
 /* State Functions */
 
 void stateIntro() {
-  maxWrite(MAX7219_digit3, F);
-  maxWrite(MAX7219_digit2, LowerI);
-  maxWrite(MAX7219_digit1, N);
-  maxWrite(MAX7219_digit0, D);
+  maxWrite(MAX7219_digit0, F);
+  maxWrite(MAX7219_digit1, LowerI);
+  maxWrite(MAX7219_digit2, N);
+  maxWrite(MAX7219_digit3, D);
   delay(1500);
-  maxWrite(MAX7219_digit3, LowerT);
-  maxWrite(MAX7219_digit2, LowerH);
-  maxWrite(MAX7219_digit1, E);
-  maxWrite(MAX7219_digit0, MAX7219_seg_blank);
+  maxWrite(MAX7219_digit0, LowerT);
+  maxWrite(MAX7219_digit1, LowerH);
+  maxWrite(MAX7219_digit2, E);
+  maxWrite(MAX7219_digit3, MAX7219_seg_blank);
   delay(1500);
-  maxWrite(MAX7219_digit3, UpperC);
-  maxWrite(MAX7219_digit2, LowerO);
-  maxWrite(MAX7219_digit1, D);
-  maxWrite(MAX7219_digit0, E);
+  maxWrite(MAX7219_digit0, UpperC);
+  maxWrite(MAX7219_digit1, LowerO);
+  maxWrite(MAX7219_digit2, D);
+  maxWrite(MAX7219_digit3, E);
   delay(1500);
   currentState = WaitForLock;
 }
@@ -430,6 +424,7 @@ void stateGuess() {
 
 void stateResult() {
   if (checkCodeGuess()) {
+    clearDisplay();
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
     currentState = Unlock;
   } else {
@@ -467,5 +462,6 @@ void stateTriesCount() {
   maxWrite(digitAddresses[2], MAX7219_digit_blank);
   maxWrite(digitAddresses[3], MAX7219_digit_blank);
   delay(4000);
+  maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
   currentState = WaitForLock;
 }
