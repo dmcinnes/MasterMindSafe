@@ -12,9 +12,13 @@
 const uint8_t CS_PIN        = 11;
 const uint8_t DIN_PIN       = 10;
 const uint8_t CLK_PIN       = 13;
-const uint8_t ENCODER_PIN_A = 2;
-const uint8_t ENCODER_PIN_B = 3;
-const uint8_t BUTTON_PIN    = 4;
+const uint8_t ENCODER_PIN_A = 3;
+const uint8_t ENCODER_PIN_B = 2;
+const uint8_t BUTTON_PIN    = 8;
+const uint8_t SERVO_PIN     = 9;
+
+const int correctNumLEDs[4]   = {4, 5, 6, 7};
+const int correctPlaceLEDs[4] = {A0, A1, A2, A3};
 
 
 // register addresses
@@ -143,9 +147,6 @@ uint8_t attempts = 0;
 
 bool digitBlinkOn = true;
 
-int correctNumLEDs[4]   = {A0, A1, A2, A3};
-int correctPlaceLEDs[4] = {5, 6, 7, 8};
-
 /*
   Send a 16-bit command packet to the device,
   comprising the +reg+ register selection and +data+ bytes.
@@ -188,15 +189,15 @@ void startupDisplay(byte intensity) {
 }
 
 void lockDoor() {
-  lockServo.write(180);
+  lockServo.write(0);
 }
 
 void unlockDoor() {
-  lockServo.write(1);
+  lockServo.write(180);
 }
 
 void setup() {
-  lockServo.attach(9);
+  lockServo.attach(SERVO_PIN);
 
   for (uint8_t i = 0; i < 4; i++) {
     pinMode(correctNumLEDs[i], OUTPUT);
@@ -361,7 +362,7 @@ void stateIntro() {
 }
 
 void stateWaitForLock() {
-  scrollTextTick(PressToLockCrawl, PressToLockCrawlSize, 500);
+  scrollTextTick(PressToLockCrawl, PressToLockCrawlSize, 200);
   if (nextButtonCheck <= currentMillis) {
     nextButtonCheck = currentMillis + 5;
     if (buttonState()) {
@@ -384,7 +385,7 @@ void stateLock() {
 }
 
 void stateLockMessage() {
-  if (scrollTextTick(LockedCrawl, LockedCrawlSize, 300)) {
+  if (scrollTextTick(LockedCrawl, LockedCrawlSize, 200)) {
     // stateGuess needs to decode the digits
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     generateNewCode();
