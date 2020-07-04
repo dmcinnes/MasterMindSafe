@@ -81,8 +81,20 @@ const uint8_t seekPattern[][2] = {
 };
 unsigned long nextPatternTick = 0;
 
-const uint8_t waitLEDPatternSize = 12;
+const uint8_t waitLEDPatternSize = 8;
 const uint8_t waitLEDPattern[waitLEDPatternSize] = {
+  0b00010000,
+  0b10000000,
+  0b01000000,
+  0b00100000,
+  0b00000010,
+  0b00000100,
+  0b00001000,
+  0b00000001,
+};
+
+const uint8_t winLEDPatternSize = 12;
+const uint8_t winLEDPattern[winLEDPatternSize] = {
   0b00000001,
   0b00010000,
   0b00001000,
@@ -422,7 +434,7 @@ void stateWaitForLock() {
     }
   }
   if (nextLEDUpdate <= currentMillis) {
-    nextLEDUpdate = currentMillis + 100;
+    nextLEDUpdate = currentMillis + 500;
     LEDPatternTick(waitLEDPattern, waitLEDPatternSize);
   }
 }
@@ -545,11 +557,19 @@ void stateUnlock() {
       currentState = UnlockMessage;
     }
   }
+  if (nextLEDUpdate <= currentMillis) {
+    nextLEDUpdate = currentMillis + 100;
+    LEDPatternTick(winLEDPattern, winLEDPatternSize);
+  }
 }
 
 void stateUnlockMessage() {
   if (scrollTextTick(UnlockedCrawl, UnlockedCrawlSize, 200)) {
     currentState = Tries;
+  }
+  if (nextLEDUpdate <= currentMillis) {
+    nextLEDUpdate = currentMillis + 100;
+    LEDPatternTick(winLEDPattern, winLEDPatternSize);
   }
 }
 
@@ -558,26 +578,42 @@ void stateTries() {
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     currentState = TriesCount;
   }
+  if (nextLEDUpdate <= currentMillis) {
+    nextLEDUpdate = currentMillis + 100;
+    LEDPatternTick(winLEDPattern, winLEDPatternSize);
+  }
 }
 
 void stateTriesCount() {
-  if (attempts > 999) {
-    maxWrite(digitAddresses[0], (attempts % 10000) / 1000);
-  } else {
-    maxWrite(digitAddresses[0], MAX7219_digit_blank);
+  static bool shown = false;
+  static long waitUntil;
+  if (!shown) {
+    waitUntil = currentMillis + 4000;
+    shown = true;
+    if (attempts > 999) {
+      maxWrite(digitAddresses[0], (attempts % 10000) / 1000);
+    } else {
+      maxWrite(digitAddresses[0], MAX7219_digit_blank);
+    }
+    if (attempts > 99) {
+      maxWrite(digitAddresses[1], (attempts % 1000) / 100);
+    } else {
+      maxWrite(digitAddresses[1], MAX7219_digit_blank);
+    }
+    if (attempts > 9) {
+      maxWrite(digitAddresses[2], (attempts % 100) / 10);
+    } else {
+      maxWrite(digitAddresses[2], MAX7219_digit_blank);
+    }
+    maxWrite(digitAddresses[3], attempts % 10);
   }
-  if (attempts > 99) {
-    maxWrite(digitAddresses[1], (attempts % 1000) / 100);
-  } else {
-    maxWrite(digitAddresses[1], MAX7219_digit_blank);
+  if (nextLEDUpdate <= currentMillis) {
+    nextLEDUpdate = currentMillis + 100;
+    LEDPatternTick(winLEDPattern, winLEDPatternSize);
   }
-  if (attempts > 9) {
-    maxWrite(digitAddresses[2], (attempts % 100) / 10);
-  } else {
-    maxWrite(digitAddresses[2], MAX7219_digit_blank);
+  if (waitUntil <= currentMillis) {
+    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
+    shown = false;
+    currentState = WaitForLock;
   }
-  maxWrite(digitAddresses[3], attempts % 10);
-  delay(4000);
-  maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
-  currentState = WaitForLock;
 }
