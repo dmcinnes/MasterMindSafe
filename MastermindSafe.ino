@@ -20,7 +20,6 @@ const uint8_t SERVO_PIN     = 9;
 const int correctNumLEDs[4]   = {4, 5, 6, 7};
 const int correctPlaceLEDs[4] = {A0, A1, A2, A3};
 
-
 // register addresses
 const uint8_t MAX7219_noop        = 0x00;
 const uint8_t MAX7219_digit0      = 0x01;
@@ -159,11 +158,12 @@ void maxWrite(byte reg, byte data) {
   digitalWrite(CS_PIN, HIGH);
 }
 
-const uint8_t stateCount = 10;
+const uint8_t stateCount = 12;
 void (*stateFunctions[stateCount]) () =
-  { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateGuess, stateResult, stateUnlock, stateUnlockMessage, stateTries, stateTriesCount };
-enum States { Intro, WaitForLock, Lock, LockMessage, Guess, Result, Unlock, UnlockMessage, Tries, TriesCount };
-volatile uint8_t currentState = Intro;
+  { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateReset, stateGuess, stateResult, stateSuccess, stateUnlock, stateUnlockMessage, stateTries, stateTriesCount };
+enum States { Intro, WaitForLock, Lock, LockMessage, Reset, Guess, Result, Success, Unlock, UnlockMessage, Tries, TriesCount };
+/* volatile uint8_t currentState = Intro; */
+volatile uint8_t currentState = Success;
 
 /*
 On initial power-up, all control registers are reset, the
@@ -222,11 +222,18 @@ void setup() {
   unlockDoor();
 }
 
-void clearDisplay() {
+void clearSegmentDisplay() {
   maxWrite(digitAddresses[0], Space);
   maxWrite(digitAddresses[1], Space);
   maxWrite(digitAddresses[2], Space);
   maxWrite(digitAddresses[3], Space);
+}
+
+void clearDigitDisplay() {
+  maxWrite(digitAddresses[0], MAX7219_digit_blank);
+  maxWrite(digitAddresses[1], MAX7219_digit_blank);
+  maxWrite(digitAddresses[2], MAX7219_digit_blank);
+  maxWrite(digitAddresses[3], MAX7219_digit_blank);
 }
 
 void updateDigits() {
@@ -294,9 +301,14 @@ void resetTextTick() {
 }
 
 void generateNewCode() {
-  Serial.print("Code: ");
   for (uint8_t i = 0; i < 4; i++) {
     secretCode[i] = random(0, 9);
+  }
+}
+
+void clearGuess() {
+  for (uint8_t i = 0; i < 4; i++) {
+    codeGuess[i] = 0;
   }
 }
 
@@ -366,7 +378,7 @@ void stateWaitForLock() {
   if (nextButtonCheck <= currentMillis) {
     nextButtonCheck = currentMillis + 5;
     if (buttonState()) {
-      clearDisplay();
+      clearSegmentDisplay();
       resetTextTick();
       attempts = 0;
       currentState = Lock;
@@ -386,12 +398,18 @@ void stateLock() {
 
 void stateLockMessage() {
   if (scrollTextTick(LockedCrawl, LockedCrawlSize, 200)) {
-    // stateGuess needs to decode the digits
-    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
-    generateNewCode();
-    attempts = 1;
-    currentState = Guess;
+    currentState = Reset;
   }
+}
+
+void stateReset() {
+  generateNewCode();
+  clearGuess();
+  attempts = 1;
+  currentDigit = 0;
+  // stateGuess needs to decode the digits
+  maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
+  currentState = Guess;
 }
 
 void stateGuess() {
@@ -425,13 +443,38 @@ void stateGuess() {
 
 void stateResult() {
   if (checkCodeGuess()) {
-    clearDisplay();
-    maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
-    currentState = Unlock;
+    currentState = Success;
   } else {
     attempts++;
     currentState = Guess;
   }
+}
+
+void stateSuccess() {
+  digitBlinkOn = true;
+  maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
+
+  clearDigitDisplay();
+  delay(100);
+  updateDigits();
+  delay(200);
+  clearDigitDisplay();
+  delay(100);
+  updateDigits();
+  delay(200);
+  clearDigitDisplay();
+  delay(100);
+  updateDigits();
+  delay(200);
+  clearDigitDisplay();
+  delay(100);
+  updateDigits();
+  delay(200);
+
+  // Unlock needs segment mode
+  maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
+  clearSegmentDisplay();
+  currentState = Unlock;
 }
 
 void stateUnlock() {
