@@ -162,8 +162,7 @@ const uint8_t stateCount = 12;
 void (*stateFunctions[stateCount]) () =
   { stateIntro, stateWaitForLock, stateLock, stateLockMessage, stateReset, stateGuess, stateResult, stateSuccess, stateUnlock, stateUnlockMessage, stateTries, stateTriesCount };
 enum States { Intro, WaitForLock, Lock, LockMessage, Reset, Guess, Result, Success, Unlock, UnlockMessage, Tries, TriesCount };
-/* volatile uint8_t currentState = Intro; */
-volatile uint8_t currentState = Success;
+volatile uint8_t currentState = Intro;
 
 /*
 On initial power-up, all control registers are reset, the
@@ -405,8 +404,10 @@ void stateLockMessage() {
 void stateReset() {
   generateNewCode();
   clearGuess();
+  encoder.setPosition(0);
   attempts = 1;
   currentDigit = 0;
+  updateLEDs(0, 0);
   // stateGuess needs to decode the digits
   maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
   currentState = Guess;
@@ -433,10 +434,10 @@ void stateGuess() {
     if (buttonState()) {
       currentDigit++;
       if (currentDigit == 4) {
-        currentDigit = 0;
         currentState = Result;
+      } else {
+        encoder.setPosition(codeGuess[currentDigit]);
       }
-      encoder.setPosition(codeGuess[currentDigit]);
     }
   }
 }
@@ -446,6 +447,8 @@ void stateResult() {
     currentState = Success;
   } else {
     attempts++;
+    currentDigit = 0;
+    encoder.setPosition(codeGuess[currentDigit]);
     currentState = Guess;
   }
 }
@@ -488,23 +491,35 @@ void stateUnlock() {
 }
 
 void stateUnlockMessage() {
-  if (scrollTextTick(UnlockedCrawl, UnlockedCrawlSize, 300)) {
+  if (scrollTextTick(UnlockedCrawl, UnlockedCrawlSize, 200)) {
     currentState = Tries;
   }
 }
 
 void stateTries() {
-  if (scrollTextTick(TriesCrawl, TriesCrawlSize, 300)) {
+  if (scrollTextTick(TriesCrawl, TriesCrawlSize, 200)) {
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     currentState = TriesCount;
   }
 }
 
 void stateTriesCount() {
-  maxWrite(digitAddresses[0], attempts);
-  maxWrite(digitAddresses[1], MAX7219_digit_blank);
-  maxWrite(digitAddresses[2], MAX7219_digit_blank);
-  maxWrite(digitAddresses[3], MAX7219_digit_blank);
+  if (attempts > 999) {
+    maxWrite(digitAddresses[0], (attempts % 10000) / 1000);
+  } else {
+    maxWrite(digitAddresses[0], MAX7219_digit_blank);
+  }
+  if (attempts > 99) {
+    maxWrite(digitAddresses[1], (attempts % 1000) / 100);
+  } else {
+    maxWrite(digitAddresses[1], MAX7219_digit_blank);
+  }
+  if (attempts > 9) {
+    maxWrite(digitAddresses[2], (attempts % 100) / 10);
+  } else {
+    maxWrite(digitAddresses[2], MAX7219_digit_blank);
+  }
+  maxWrite(digitAddresses[3], attempts % 10);
   delay(4000);
   maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
   currentState = WaitForLock;
