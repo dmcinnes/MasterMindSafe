@@ -189,7 +189,7 @@ void startupDisplay(byte intensity) {
 }
 
 void lockDoor() {
-  lockServo.write(0);
+  lockServo.write(5);
 }
 
 void unlockDoor() {
