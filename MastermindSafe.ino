@@ -115,6 +115,7 @@ const uint8_t LowerC = 0x0D;
 const uint8_t D      = 0x3D;
 const uint8_t E      = 0x4F;
 const uint8_t F      = 0x47;
+const uint8_t G      = 0x7B;
 const uint8_t UpperH = 0x37;
 const uint8_t LowerH = 0x17;
 const uint8_t UpperI = 0x06;
@@ -122,7 +123,7 @@ const uint8_t LowerI = 0x04;
 const uint8_t K      = 0x57;
 const uint8_t L      = 0x0E;
 const uint8_t N      = 0x15;
-const uint8_t UpperO = 0x77;
+const uint8_t UpperO = 0x7E;
 const uint8_t LowerO = 0x1D;
 const uint8_t P      = 0x67;
 const uint8_t R      = 0x05;
@@ -149,9 +150,9 @@ const uint8_t UnlockedCrawlSize = 8;
 const uint8_t UnlockedCrawl[UnlockedCrawlSize] =
 { UpperU, N, L, LowerO, LowerC, K, E, D };
 
-const uint8_t TriesCrawlSize = 11;
-const uint8_t TriesCrawl[TriesCrawlSize] =
-{ UpperT, LowerO, LowerT, A, L, Space, UpperT, R, LowerI, E, S };
+const uint8_t GuessesCrawlSize = 13;
+const uint8_t GuessesCrawl[GuessesCrawlSize] =
+{ UpperT, UpperO, UpperT, A, L, Space, G, UpperU, E, S, S, E, S };
 
 unsigned long nextCrawlUpdate = 0;
 uint8_t crawlOffset = 0;
@@ -574,7 +575,7 @@ void stateUnlockMessage() {
 }
 
 void stateTries() {
-  if (scrollTextTick(TriesCrawl, TriesCrawlSize, 200)) {
+  if (scrollTextTick(GuessesCrawl, GuessesCrawlSize, 200)) {
     maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
     currentState = TriesCount;
   }
