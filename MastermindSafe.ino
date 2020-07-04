@@ -81,6 +81,22 @@ const uint8_t seekPattern[][2] = {
 };
 unsigned long nextPatternTick = 0;
 
+const uint8_t waitLEDPatternSize = 12;
+const uint8_t waitLEDPattern[waitLEDPatternSize] = {
+  0b00000001,
+  0b00010000,
+  0b00001000,
+  0b10000000,
+  0b00000100,
+  0b01000000,
+  0b00000010,
+  0b00100000,
+  0b00000100,
+  0b01000000,
+  0b00001000,
+  0b10000000,
+};
+
 const uint8_t A      = 0x77;
 const uint8_t UpperC = 0x4E;
 const uint8_t LowerC = 0x0D;
@@ -127,6 +143,9 @@ const uint8_t TriesCrawl[TriesCrawlSize] =
 
 unsigned long nextCrawlUpdate = 0;
 uint8_t crawlOffset = 0;
+
+unsigned long nextLEDUpdate = 0;
+uint8_t LEDOffset = 0;
 
 RotaryEncoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 
@@ -255,6 +274,20 @@ bool patternTick(const uint8_t pattern[][2], uint8_t size) {
   return (patternOffset == size);
 }
 
+bool LEDPatternTick(const uint8_t pattern[], uint8_t size) {
+  static int patternOffset = 0;
+  if (patternOffset >= size) {
+    patternOffset = 0;
+  }
+  uint8_t current = pattern[patternOffset];
+  for (uint8_t i = 0; i < 4 ; i++) {
+    digitalWrite(correctNumLEDs[i], (current >> i) & 0x1);
+    digitalWrite(correctPlaceLEDs[i], (current >> (i + 4)) & 0x1);
+  }
+  patternOffset++;
+  return (patternOffset == size);
+}
+
 uint8_t encoderPosition() {
   long newPosition = encoder.getPosition() % 10;
   if (newPosition < 0) {
@@ -358,17 +391,21 @@ void stateIntro() {
   maxWrite(MAX7219_digit1, LowerI);
   maxWrite(MAX7219_digit2, N);
   maxWrite(MAX7219_digit3, D);
+  updateLEDs(4, 0);
   delay(1500);
   maxWrite(MAX7219_digit0, LowerT);
   maxWrite(MAX7219_digit1, LowerH);
   maxWrite(MAX7219_digit2, E);
   maxWrite(MAX7219_digit3, MAX7219_seg_blank);
+  updateLEDs(0, 4);
   delay(1500);
   maxWrite(MAX7219_digit0, UpperC);
   maxWrite(MAX7219_digit1, LowerO);
   maxWrite(MAX7219_digit2, D);
   maxWrite(MAX7219_digit3, E);
+  updateLEDs(4, 4);
   delay(1500);
+  updateLEDs(0, 0);
   currentState = WaitForLock;
 }
 
@@ -380,8 +417,13 @@ void stateWaitForLock() {
       clearSegmentDisplay();
       resetTextTick();
       attempts = 0;
+      updateLEDs(0, 0);
       currentState = Lock;
     }
+  }
+  if (nextLEDUpdate <= currentMillis) {
+    nextLEDUpdate = currentMillis + 100;
+    LEDPatternTick(waitLEDPattern, waitLEDPatternSize);
   }
 }
 
@@ -462,17 +504,26 @@ void stateSuccess() {
   delay(100);
   updateDigits();
   delay(200);
+
   updateLEDs(4, 0);
   clearDigitDisplay();
   delay(100);
   updateDigits();
   delay(200);
+
   updateLEDs(0, 4);
   clearDigitDisplay();
   delay(100);
   updateDigits();
   delay(200);
+
   updateLEDs(4, 0);
+  clearDigitDisplay();
+  delay(100);
+  updateDigits();
+  delay(200);
+
+  updateLEDs(0, 4);
   clearDigitDisplay();
   delay(100);
   updateDigits();
