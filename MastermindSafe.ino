@@ -457,22 +457,28 @@ void stateSuccess() {
   digitBlinkOn = true;
   maxWrite(MAX7219_decodeMode, MAX7219_DECODE_ALL);
 
+  updateLEDs(0, 4);
   clearDigitDisplay();
   delay(100);
   updateDigits();
   delay(200);
+  updateLEDs(4, 0);
   clearDigitDisplay();
   delay(100);
   updateDigits();
   delay(200);
+  updateLEDs(0, 4);
   clearDigitDisplay();
   delay(100);
   updateDigits();
   delay(200);
+  updateLEDs(4, 0);
   clearDigitDisplay();
   delay(100);
   updateDigits();
   delay(200);
+
+  updateLEDs(0, 0);
 
   // Unlock needs segment mode
   maxWrite(MAX7219_decodeMode, MAX7219_DECODE_NONE);
